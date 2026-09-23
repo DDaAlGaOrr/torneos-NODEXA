@@ -11,6 +11,9 @@ import { roundsRoutes } from './round.routes'
 import { matchRoutes } from './match.routes'
 import { matchesRoutes } from './match_event.routes'
 import { standingsRoutes } from './standing.routes'
+import { statisticsRoutes } from './statistic.router'
+import { bracketRoutes } from './bracket.routes'
+
 export const router = Router();
 
 router.use('/auth', authRoutes);
@@ -25,3 +28,5 @@ router.use('/tournaments', roundsRoutes)
 router.use('/tournaments', matchRoutes)
 router.use('/matches', matchesRoutes)
 router.use('/tournaments', standingsRoutes)
+router.use('/tournaments', statisticsRoutes)
+router.use('/tournaments', bracketRoutes)

@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import { router } from './routes';
+import { errorHandler } from './middlewares/error.handler';
 dotenv.config();
 
 const app: Express = express();
@@ -18,6 +19,7 @@ app.get('/test', (req: Request, res: Response) => {
 });
 
 app.use('/api', router);
+app.use(errorHandler);
 
 app.listen(port, () => {
     console.log(`[server]: El servidor está corriendo en http://localhost:${port}`);
