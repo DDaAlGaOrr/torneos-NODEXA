@@ -1,6 +1,6 @@
 import pool from '../conection/index';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
-
+import { AppError } from '../middlewares/error.handler';
 export async function verifyTournamentOwnership(tournamentId: number, organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
         'SELECT id FROM tournaments WHERE id = ? AND organization_id = ?',
@@ -66,3 +66,66 @@ export async function remove(id: number) {
     return result.affectedRows > 0;
 }
 
+export async function finishAndAdvance(matchId: number) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const [rows] = await connection.query<RowDataPacket[]>(
+            `SELECT home_team_id, away_team_id, score_home, score_away, penalties_home, penalties_away, next_match_id, next_match_position 
+             FROM matches WHERE id = ?`,
+            [matchId]
+        );
+
+        if (rows.length === 0) throw new AppError(400, 'Partido no encontrado');
+        const match = rows[0];
+
+        if (match.next_match_id && match.next_match_position) {
+            if (match.score_home === match.score_away) {
+                if (match.penalties_home === null || match.penalties_away === null) {
+                    throw new  AppError(400,'Partido de eliminatoria empatado. Registra el resultado de los penales antes de finalizar.');
+                }
+                if (match.penalties_home === match.penalties_away) {
+                    throw new AppError(400,'El partido no puede finalizar empatado en penales.');
+                }
+            }
+        }
+
+        await connection.query(
+            `UPDATE matches SET status = 'finished' WHERE id = ?`,
+            [matchId]
+        );
+
+        if (match.next_match_id && match.next_match_position) {
+            let winnerId: number | null = null;
+
+            if (match.score_home > match.score_away) {
+                winnerId = match.home_team_id;
+            } else if (match.score_away > match.score_home) {
+                winnerId = match.away_team_id;
+            } else if (match.score_home === match.score_away) {
+                if (match.penalties_home > match.penalties_away) {
+                    winnerId = match.home_team_id;
+                } else {
+                    winnerId = match.away_team_id;
+                }
+            }
+
+            if (winnerId) {
+                const targetColumn = match.next_match_position === 'home' ? 'home_team_id' : 'away_team_id';
+                await connection.query(
+                    `UPDATE matches SET ${targetColumn} = ? WHERE id = ?`,
+                    [winnerId, match.next_match_id]
+                );
+            }
+        }
+
+        await connection.commit();
+        return true;
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
