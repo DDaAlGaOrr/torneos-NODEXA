@@ -22,3 +22,7 @@ export async function updateMatch(id: number, updateFields: any) {
 export async function deleteMatch(id: number) {
     return await matchModel.remove(id);
 }
+
+export async function finishMatchWithAdvancement(matchId: number) {
+    return await matchModel.finishAndAdvance(matchId);
+}

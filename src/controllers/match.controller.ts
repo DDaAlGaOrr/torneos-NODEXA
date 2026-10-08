@@ -5,10 +5,11 @@ import * as matchService from '../services/match.service';
 export const create = catchAsync(async (req: AuthRequest, res) => {
     const { tournamentId } = req.params;
     const organizationId = req.user.organization_id;
-    const { round_id, home_team_id, away_team_id, field_id = null, scheduled_at = null } = req.body;
 
-    if (!round_id || !home_team_id || !away_team_id) {
-        return { code: 400, data: { message: 'Faltan datos obligatorios (Jornada y Equipos)' } };
+    const { round_id, home_team_id = null, away_team_id = null, field_id = null, scheduled_at = null } = req.body;
+
+    if (!round_id) {
+        return { code: 400, data: { message: 'El ID de la jornada (round_id) es obligatorio' } };
     }
 
     const hasAccess = await matchService.checkTournamentAccess(Number(tournamentId), organizationId);
@@ -21,7 +22,6 @@ export const create = catchAsync(async (req: AuthRequest, res) => {
     );
     return { code: 201, data: result };
 });
-
 export const getByTournament = catchAsync(async (req: AuthRequest, res) => {
     const { tournamentId } = req.params;
     const organizationId = req.user.organization_id;
@@ -79,9 +79,9 @@ export const finish = catchAsync(async (req: AuthRequest, res) => {
         return { code: 403, data: { message: 'Acceso denegado' } };
     }
 
-    const success = await matchService.updateMatch(Number(id), { status: 'finished' });
-    
-    return success 
-        ? { code: 200, data: { message: 'Partido finalizado correctamente' } }
+    const success = await matchService.finishMatchWithAdvancement(Number(id));
+
+    return success
+        ? { code: 200, data: { message: 'Partido finalizado. Llaves actualizadas si aplica.' } }
         : { code: 404, data: { message: 'Partido no encontrado' } };
 });
