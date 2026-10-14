@@ -17,3 +17,10 @@ export async function createEvent(
 export async function getMatchEvents(matchId: number) {
     return await matchEventModel.getEventsByMatch(matchId);
 }
+export async function playerBelongsToTeam(playerId: number, teamId: number) {
+    return await matchEventModel.playerBelongsToTeam(playerId, teamId);
+}
+
+export async function removeEvent(eventId: number, matchId: number, matchInfo: any) {
+    return await matchEventModel.deleteEvent(eventId, matchId, matchInfo);
+}

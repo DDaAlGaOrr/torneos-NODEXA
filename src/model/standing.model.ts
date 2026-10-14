@@ -26,6 +26,7 @@ export async function calculateStandings(tournamentId: number) {
         LEFT JOIN matches m ON (m.home_team_id = t.id OR m.away_team_id = t.id) 
             AND m.tournament_id = tt.tournament_id 
             AND m.status = 'finished'
+            AND m.round_id IN (SELECT id FROM rounds WHERE tournament_id = tt.tournament_id AND type = 'group')
         WHERE tt.tournament_id = ? AND tt.status = 'confirmed'
         GROUP BY t.id
         ORDER BY Puntos DESC, DG DESC, GF DESC, team_name ASC`,

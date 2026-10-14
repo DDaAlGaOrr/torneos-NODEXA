@@ -1,6 +1,11 @@
 import { catchAsync } from '../middlewares/error.handler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as tournamentService from '../services/tournament.service';
+import { pickAllowed } from '../utils/fields';
+import { TOURNAMENT_UPDATABLE } from '../model/tournament.model';
+
+const FORMATS = ['bracket', 'groups_knockout', 'league', 'mixed'];
+const STATUSES = ['draft', 'registration', 'in_progress', 'finished', 'archived', 'cancelled'];
 
 export const create = catchAsync(async (req: AuthRequest, res) => {
     const organizationId = req.user.organization_id;
@@ -11,6 +16,10 @@ export const create = catchAsync(async (req: AuthRequest, res) => {
 
     if (!sport_id || !name || !format) {
         return { code: 400, data: { message: 'El deporte, nombre y formato son obligatorios' } };
+    }
+
+    if (!FORMATS.includes(format)) {
+        return { code: 400, data: { message: `Formato inválido. Valores permitidos: ${FORMATS.join(', ')}` } };
     }
 
     const result = await tournamentService.createTournament(
@@ -30,10 +39,17 @@ export const getAll = catchAsync(async (req: AuthRequest, res) => {
 export const update = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
-    const updateFields = req.body;
+    const updateFields = pickAllowed(req.body, TOURNAMENT_UPDATABLE);
 
     if (Object.keys(updateFields).length === 0) {
         return { code: 400, data: { message: 'No se enviaron datos para actualizar' } };
+    }
+
+    if (updateFields.format !== undefined && !FORMATS.includes(updateFields.format)) {
+        return { code: 400, data: { message: `Formato inválido. Valores permitidos: ${FORMATS.join(', ')}` } };
+    }
+    if (updateFields.status !== undefined && !STATUSES.includes(updateFields.status)) {
+        return { code: 400, data: { message: `Estatus inválido. Valores permitidos: ${STATUSES.join(', ')}` } };
     }
 
     const success = await tournamentService.updateTournament(Number(id), organizationId, updateFields);

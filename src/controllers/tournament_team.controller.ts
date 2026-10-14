@@ -17,6 +17,11 @@ export const enroll = catchAsync(async (req: AuthRequest, res) => {
         return { code: 403, data: { message: 'Acceso denegado: El torneo o el equipo no pertenecen a tu liga' } };
     }
 
+    const hasRoom = await tournamentTeamService.hasRoom(Number(tournamentId));
+    if (!hasRoom) {
+        return { code: 400, data: { message: 'El torneo ya alcanzó el máximo de equipos' } };
+    }
+
     try {
         const result = await tournamentTeamService.enrollTeam(Number(tournamentId), team_id);
         return { code: 201, data: result };
@@ -53,8 +58,8 @@ export const withdraw = catchAsync(async (req: AuthRequest, res) => {
     const success = await tournamentTeamService.withdrawTeam(Number(tournamentId), Number(teamId));
 
     if (!success) {
-        return { code: 404, data: { message: 'Inscripción no encontrada' } };
+        return { code: 404, data: { message: 'Inscripción activa no encontrada' } };
     }
 
-    return { code: 200, data: { message: 'Equipo dado de baja del torneo correctamente' } };
+    return { code: 200, data: { message: 'Equipo dado de baja del torneo (el historial se conserva)' } };
 });

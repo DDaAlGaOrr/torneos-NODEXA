@@ -1,6 +1,8 @@
 import { catchAsync } from '../middlewares/error.handler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as playerService from '../services/player.service';
+import { pickAllowed } from '../utils/fields';
+import { PLAYER_UPDATABLE } from '../model/player.model';
 
 export const create = catchAsync(async (req: AuthRequest, res) => {
     const organizationId = req.user.organization_id;
@@ -34,7 +36,8 @@ export const getByTeam = catchAsync(async (req: AuthRequest, res) => {
 
 export const update = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
-    const { team_id, ...updateFields } = req.body;
+    const { team_id } = req.body;
+    const updateFields = pickAllowed(req.body, PLAYER_UPDATABLE);
     const organizationId = req.user.organization_id;
 
     if (!team_id) {
@@ -50,7 +53,7 @@ export const update = catchAsync(async (req: AuthRequest, res) => {
         return { code: 400, data: { message: 'No se enviaron datos para actualizar' } };
     }
 
-    const success = await playerService.updatePlayer(Number(id), updateFields);
+    const success = await playerService.updatePlayer(Number(id), Number(team_id), updateFields);
     return success
         ? { code: 200, data: { message: 'Jugador actualizado' } }
         : { code: 404, data: { message: 'Jugador no encontrado' } };
@@ -65,7 +68,7 @@ export const remove = catchAsync(async (req: AuthRequest, res) => {
         return { code: 403, data: { message: 'Acceso denegado' } };
     }
 
-    const success = await playerService.deletePlayer(Number(id));
+    const success = await playerService.deletePlayer(Number(id), Number(teamId));
     return success
         ? { code: 200, data: { message: 'Jugador eliminado' } }
         : { code: 404, data: { message: 'Jugador no encontrado' } };

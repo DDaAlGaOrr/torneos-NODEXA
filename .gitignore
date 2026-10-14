@@ -1,2 +1,8 @@
 /node_modules
 .env
+/migrations
+fixes-seguridad-y-partidos.patch
+002-grupos-y-cuadro-automatico.patch
+fixes-seguridad-y-partidos.patch
+e2e-flow.mjs
+e2e-groups-bracket.mjs
