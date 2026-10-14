@@ -1,12 +1,81 @@
 import pool from '../conection/index';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { AppError } from '../middlewares/error.handler';
+import { buildSet } from '../utils/fields';
+
+export const MATCH_UPDATABLE = [
+    'round_id', 'home_team_id', 'away_team_id', 'field_id', 'scheduled_at', 'status',
+    'score_home', 'score_away', 'penalties_home', 'penalties_away',
+    'next_match_id', 'next_match_position'
+] as const;
+
+const MATCH_STATUSES = ['scheduled', 'in_progress', 'finished', 'cancelled', 'postponed'];
 export async function verifyTournamentOwnership(tournamentId: number, organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
         'SELECT id FROM tournaments WHERE id = ? AND organization_id = ?',
         [tournamentId, organizationId]
     );
     return rows.length > 0;
+}
+
+/**
+ * Verifica que round, equipos, cancha y siguiente partido pertenezcan al torneo
+ * (y a la organización). Devuelve un mensaje de error o null si todo es válido.
+ * Solo valida los campos que vienen definidos.
+ */
+export async function validateMatchRefs(
+    tournamentId: number, organizationId: number,
+    refs: { round_id?: any; home_team_id?: any; away_team_id?: any; field_id?: any; next_match_id?: any; status?: any }
+): Promise<string | null> {
+    const has = (v: any) => v !== undefined && v !== null;
+
+    if (has(refs.status) && !MATCH_STATUSES.includes(refs.status)) {
+        return 'Estatus de partido inválido';
+    }
+    if (has(refs.home_team_id) && has(refs.away_team_id) && Number(refs.home_team_id) === Number(refs.away_team_id)) {
+        return 'El equipo local y el visitante no pueden ser el mismo';
+    }
+    if (has(refs.round_id)) {
+        const [r] = await pool.query<RowDataPacket[]>(
+            'SELECT id FROM rounds WHERE id = ? AND tournament_id = ?', [refs.round_id, tournamentId]
+        );
+        if (r.length === 0) return 'La jornada no pertenece a este torneo';
+    }
+    for (const teamId of [refs.home_team_id, refs.away_team_id]) {
+        if (has(teamId)) {
+            const [r] = await pool.query<RowDataPacket[]>(
+                "SELECT id FROM tournament_teams WHERE tournament_id = ? AND team_id = ? AND status = 'confirmed'", [tournamentId, teamId]
+            );
+            if (r.length === 0) return 'Uno de los equipos no está inscrito (confirmado) en este torneo';
+        }
+    }
+    if (has(refs.round_id) && has(refs.home_team_id) && has(refs.away_team_id)) {
+        const [rt] = await pool.query<RowDataPacket[]>('SELECT type FROM rounds WHERE id = ?', [refs.round_id]);
+        if (rt.length > 0 && rt[0].type === 'group') {
+            const [g] = await pool.query<RowDataPacket[]>(
+                'SELECT team_id, group_id FROM group_teams WHERE tournament_id = ? AND team_id IN (?, ?)',
+                [tournamentId, refs.home_team_id, refs.away_team_id]
+            );
+            const groupOf = (id: any) => g.find(x => Number(x.team_id) === Number(id))?.group_id;
+            const gh = groupOf(refs.home_team_id), ga = groupOf(refs.away_team_id);
+            if (gh !== undefined && ga !== undefined && gh !== ga) {
+                return 'En fase de grupos los dos equipos deben pertenecer al mismo grupo';
+            }
+        }
+    }
+    if (has(refs.field_id)) {
+        const [r] = await pool.query<RowDataPacket[]>(
+            'SELECT id FROM fields WHERE id = ? AND organization_id = ?', [refs.field_id, organizationId]
+        );
+        if (r.length === 0) return 'La cancha no pertenece a tu organización';
+    }
+    if (has(refs.next_match_id)) {
+        const [r] = await pool.query<RowDataPacket[]>(
+            'SELECT id FROM matches WHERE id = ? AND tournament_id = ?', [refs.next_match_id, tournamentId]
+        );
+        if (r.length === 0) return 'El siguiente partido no pertenece a este torneo';
+    }
+    return null;
 }
 
 export async function create(
@@ -44,79 +113,82 @@ export async function findAllByTournament(tournamentId: number) {
     return rows;
 }
 
-export async function update(id: number, updateFields: any) {
-    const fields = Object.keys(updateFields);
-    if (fields.length === 0) return false;
-
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = Object.values(updateFields);
+export async function update(id: number, tournamentId: number, updateFields: any) {
+    const { keys, setClause, values } = buildSet(updateFields, MATCH_UPDATABLE);
+    if (keys.length === 0) return false;
 
     const [result] = await pool.query<ResultSetHeader>(
-        `UPDATE matches SET ${setClause} WHERE id = ?`,
-        [...values, id]
+        `UPDATE matches SET ${setClause} WHERE id = ? AND tournament_id = ?`,
+        [...values, id, tournamentId]
     );
     return result.affectedRows > 0;
 }
 
-export async function remove(id: number) {
+export async function remove(id: number, tournamentId: number) {
     const [result] = await pool.query<ResultSetHeader>(
-        'DELETE FROM matches WHERE id = ?',
-        [id]
+        'DELETE FROM matches WHERE id = ? AND tournament_id = ?',
+        [id, tournamentId]
     );
     return result.affectedRows > 0;
 }
 
-export async function finishAndAdvance(matchId: number) {
+export async function finishAndAdvance(matchId: number, tournamentId: number) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
 
+        // FOR UPDATE: bloquea la fila para evitar doble finalización concurrente
         const [rows] = await connection.query<RowDataPacket[]>(
-            `SELECT home_team_id, away_team_id, score_home, score_away, penalties_home, penalties_away, next_match_id, next_match_position 
-             FROM matches WHERE id = ?`,
-            [matchId]
+            `SELECT home_team_id, away_team_id, score_home, score_away, penalties_home, penalties_away,
+                    next_match_id, next_match_position, status
+             FROM matches WHERE id = ? AND tournament_id = ? FOR UPDATE`,
+            [matchId, tournamentId]
         );
 
-        if (rows.length === 0) throw new AppError(400, 'Partido no encontrado');
+        if (rows.length === 0) throw new AppError(404, 'Partido no encontrado');
         const match = rows[0];
 
-        if (match.next_match_id && match.next_match_position) {
-            if (match.score_home === match.score_away) {
-                if (match.penalties_home === null || match.penalties_away === null) {
-                    throw new  AppError(400,'Partido de eliminatoria empatado. Registra el resultado de los penales antes de finalizar.');
-                }
-                if (match.penalties_home === match.penalties_away) {
-                    throw new AppError(400,'El partido no puede finalizar empatado en penales.');
-                }
+        if (match.status === 'finished') {
+            throw new AppError(409, 'El partido ya está finalizado');
+        }
+        if (!match.home_team_id || !match.away_team_id) {
+            throw new AppError(400, 'El partido aún no tiene los dos equipos definidos');
+        }
+
+        const isKnockout = !!(match.next_match_id && match.next_match_position);
+
+        if (isKnockout && match.score_home === match.score_away) {
+            if (match.penalties_home === null || match.penalties_away === null) {
+                throw new AppError(400, 'Partido de eliminatoria empatado. Registra el resultado de los penales antes de finalizar.');
+            }
+            if (match.penalties_home === match.penalties_away) {
+                throw new AppError(400, 'El partido no puede finalizar empatado en penales.');
             }
         }
 
+        // Ganador: por marcador; en empate de eliminatoria, por penales; empate en grupos = null
+        let winnerTeamId: number | null = null;
+        if (match.score_home !== match.score_away) {
+            winnerTeamId = match.score_home > match.score_away ? match.home_team_id : match.away_team_id;
+        } else if (isKnockout) {
+            winnerTeamId = match.penalties_home > match.penalties_away ? match.home_team_id : match.away_team_id;
+        }
+
         await connection.query(
-            `UPDATE matches SET status = 'finished' WHERE id = ?`,
-            [matchId]
+            `UPDATE matches SET status = 'finished', winner_team_id = ?, finished_at = NOW() WHERE id = ? AND tournament_id = ?`,
+            [winnerTeamId, matchId, tournamentId]
         );
 
-        if (match.next_match_id && match.next_match_position) {
-            let winnerId: number | null = null;
-
-            if (match.score_home > match.score_away) {
-                winnerId = match.home_team_id;
-            } else if (match.score_away > match.score_home) {
-                winnerId = match.away_team_id;
-            } else if (match.score_home === match.score_away) {
-                if (match.penalties_home > match.penalties_away) {
-                    winnerId = match.home_team_id;
-                } else {
-                    winnerId = match.away_team_id;
-                }
-            }
-
-            if (winnerId) {
-                const targetColumn = match.next_match_position === 'home' ? 'home_team_id' : 'away_team_id';
-                await connection.query(
-                    `UPDATE matches SET ${targetColumn} = ? WHERE id = ?`,
-                    [winnerId, match.next_match_id]
-                );
+        if (isKnockout && winnerTeamId) {
+            const winnerId = winnerTeamId;
+            const targetColumn = match.next_match_position === 'home' ? 'home_team_id' : 'away_team_id';
+            // El siguiente partido debe ser del mismo torneo
+            const [upd] = await connection.query<ResultSetHeader>(
+                `UPDATE matches SET ${targetColumn} = ? WHERE id = ? AND tournament_id = ?`,
+                [winnerId, match.next_match_id, tournamentId]
+            );
+            if (upd.affectedRows === 0) {
+                throw new AppError(400, 'El siguiente partido de la llave no existe en este torneo');
             }
         }
 
@@ -128,4 +200,56 @@ export async function finishAndAdvance(matchId: number) {
     } finally {
         connection.release();
     }
+}
+
+export async function isRefereeAssigned(matchId: number, userId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT match_id FROM match_referees WHERE match_id = ? AND user_id = ?',
+        [matchId, userId]
+    );
+    return rows.length > 0;
+}
+
+export async function matchBelongsToTournament(matchId: number, tournamentId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT id FROM matches WHERE id = ? AND tournament_id = ?',
+        [matchId, tournamentId]
+    );
+    return rows.length > 0;
+}
+
+export async function isActiveReferee(userId: number, organizationId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        "SELECT id FROM users WHERE id = ? AND organization_id = ? AND role = 'referee' AND active = 1",
+        [userId, organizationId]
+    );
+    return rows.length > 0;
+}
+
+export async function assignReferee(matchId: number, userId: number, role: string) {
+    await pool.query(
+        'INSERT INTO match_referees (match_id, user_id, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)',
+        [matchId, userId, role]
+    );
+    return { match_id: matchId, user_id: userId, role };
+}
+
+export async function findReferees(matchId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        `SELECT u.id as user_id, u.name, u.email, mr.role
+         FROM match_referees mr
+         INNER JOIN users u ON mr.user_id = u.id
+         WHERE mr.match_id = ?
+         ORDER BY mr.role ASC, u.name ASC`,
+        [matchId]
+    );
+    return rows;
+}
+
+export async function removeReferee(matchId: number, userId: number) {
+    const [result] = await pool.query<ResultSetHeader>(
+        'DELETE FROM match_referees WHERE match_id = ? AND user_id = ?',
+        [matchId, userId]
+    );
+    return result.affectedRows > 0;
 }

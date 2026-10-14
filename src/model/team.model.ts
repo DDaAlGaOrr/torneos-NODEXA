@@ -39,9 +39,11 @@ export async function create(
 
 export async function findAllByOrganization(organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
-        `SELECT t.id, t.name, t.short_name, t.primary_color, c.name as category_name
+        `SELECT t.id, t.name, t.short_name, t.primary_color, c.name as category_name,
+                t.captain_player_id, cp.name as captain_name
          FROM teams t
          LEFT JOIN categories c ON t.category_id = c.id
+         LEFT JOIN players cp ON t.captain_player_id = cp.id
          WHERE t.organization_id = ? 
          ORDER BY t.name ASC`,
         [organizationId]
@@ -95,6 +97,23 @@ export async function remove(id: number, organizationId: number) {
     const [result] = await pool.query<ResultSetHeader>(
         'DELETE FROM teams WHERE id = ? AND organization_id = ?',
         [id, organizationId]
+    );
+    return result.affectedRows > 0;
+}
+/** Asigna (o quita con null) al capitán. El jugador debe pertenecer al equipo y el equipo a la organización. */
+export async function setCaptain(teamId: number, organizationId: number, playerId: number | null) {
+    if (playerId !== null) {
+        const [rows] = await pool.query<RowDataPacket[]>(
+            `SELECT p.id FROM players p
+             INNER JOIN teams t ON p.team_id = t.id
+             WHERE p.id = ? AND t.id = ? AND t.organization_id = ?`,
+            [playerId, teamId, organizationId]
+        );
+        if (rows.length === 0) return false;
+    }
+    const [result] = await pool.query<ResultSetHeader>(
+        'UPDATE teams SET captain_player_id = ? WHERE id = ? AND organization_id = ?',
+        [playerId, teamId, organizationId]
     );
     return result.affectedRows > 0;
 }

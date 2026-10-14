@@ -8,12 +8,12 @@ export async function getPlayersByTeam(teamId: number) {
     return await playerModel.findAllByTeam(teamId);
 }
 
-export async function updatePlayer(id: number, updateFields: any) {
-    return await playerModel.update(id, updateFields);
+export async function updatePlayer(id: number, teamId: number, updateFields: any) {
+    return await playerModel.update(id, teamId, updateFields);
 }
 
-export async function deletePlayer(id: number) {
-    return await playerModel.remove(id);
+export async function deletePlayer(id: number, teamId: number) {
+    return await playerModel.remove(id, teamId);
 }
 
 export async function checkTeamAccess(teamId: number, organizationId: number) {

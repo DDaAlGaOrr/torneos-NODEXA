@@ -67,3 +67,18 @@ export const remove = catchAsync(async (req: AuthRequest, res) => {
 
     return { code: 200, data: { message: 'Equipo eliminado correctamente' } };
 });
+
+export const setCaptain = catchAsync(async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const organizationId = req.user.organization_id;
+    const { player_id = null } = req.body;
+
+    const success = await teamService.setCaptain(
+        Number(id), organizationId, player_id === null ? null : Number(player_id)
+    );
+
+    if (!success) {
+        return { code: 404, data: { message: 'Equipo no encontrado o el jugador no pertenece al equipo' } };
+    }
+    return { code: 200, data: { message: player_id === null ? 'Capitán removido' : 'Capitán asignado correctamente' } };
+});

@@ -13,6 +13,7 @@ import { matchesRoutes } from './match_event.routes'
 import { standingsRoutes } from './standing.routes'
 import { statisticsRoutes } from './statistic.router'
 import { bracketRoutes } from './bracket.routes'
+import { groupRoutes } from './group.routes'
 
 export const router = Router();
 
@@ -30,3 +31,4 @@ router.use('/matches', matchesRoutes)
 router.use('/tournaments', standingsRoutes)
 router.use('/tournaments', statisticsRoutes)
 router.use('/tournaments', bracketRoutes)
+router.use('/tournaments', groupRoutes)

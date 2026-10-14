@@ -10,6 +10,10 @@ dotenv.config();
 const SECRET = process.env.JWT_SECRET
 const EXPIRES = process.env.JWT_EXPIRES_IN
 
+if (!SECRET) {
+    throw new Error('JWT_SECRET no está definido en las variables de entorno');
+}
+
 export async function login(email: string, password: string) {
     const user = await authModel.findByEmail(email);
     if (!user) {
@@ -31,7 +35,7 @@ export async function login(email: string, password: string) {
         organization_id: user.organization_id,
     };
 
-    const token = jwt.sign(payload, SECRET, { expiresIn: EXPIRES });
+    const token = jwt.sign(payload, SECRET, { expiresIn: EXPIRES, algorithm: 'HS256' });
 
     return {
         token,
@@ -40,6 +44,6 @@ export async function login(email: string, password: string) {
 }
 
 export function verifyToken(token: string) {
-    return jwt.verify(token, SECRET);
+    return jwt.verify(token, SECRET, { algorithms: ['HS256'] });
 
 }

@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import * as categoryController from '../controllers/category.controller'
-import { requireAuth } from '../middlewares/auth.middleware';
+import { requireAuth, requireRole } from '../middlewares/auth.middleware';
 
 export const categoryRoutes = Router();
 
-categoryRoutes.post('/', requireAuth, categoryController.create);
+categoryRoutes.post('/', requireAuth, requireRole('admin'), categoryController.create);
 categoryRoutes.get('/', requireAuth, categoryController.getAll);
-categoryRoutes.put('/:id', requireAuth, categoryController.update);
-categoryRoutes.delete('/:id', requireAuth, categoryController.remove);
+categoryRoutes.put('/:id', requireAuth, requireRole('admin'), categoryController.update);
+categoryRoutes.delete('/:id', requireAuth, requireRole('admin'), categoryController.remove);

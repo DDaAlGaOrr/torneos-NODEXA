@@ -29,3 +29,6 @@ export async function updateTeam(
 export async function deleteTeam(id: number, organizationId: number) {
     return await teamModel.remove(id, organizationId);
 }
+export async function setCaptain(teamId: number, organizationId: number, playerId: number | null) {
+    return await teamModel.setCaptain(teamId, organizationId, playerId);
+}

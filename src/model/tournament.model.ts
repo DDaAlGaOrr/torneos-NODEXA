@@ -1,5 +1,11 @@
 import pool from '../conection/index';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { buildSet } from '../utils/fields';
+
+export const TOURNAMENT_UPDATABLE = [
+    'sport_id', 'category_id', 'name', 'description', 'format', 'status',
+    'max_teams', 'rules_config', 'start_date', 'end_date'
+] as const;
 
 export async function create(
     organizationId: number, sportId: number, categoryId: number, name: string,
@@ -32,16 +38,14 @@ export async function findAllByOrganization(organizationId: number) {
 }
 
 export async function update(id: number, organizationId: number, updateFields: any) {
-    const fields = Object.keys(updateFields);
-    if (fields.length === 0) return false;
-
+    const data = { ...updateFields };
     // Si viene rules_config como objeto, lo pasamos a string JSON
-    if (updateFields.rules_config && typeof updateFields.rules_config === 'object') {
-        updateFields.rules_config = JSON.stringify(updateFields.rules_config);
+    if (data.rules_config && typeof data.rules_config === 'object') {
+        data.rules_config = JSON.stringify(data.rules_config);
     }
 
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = Object.values(updateFields);
+    const { keys, setClause, values } = buildSet(data, TOURNAMENT_UPDATABLE);
+    if (keys.length === 0) return false;
 
     const [result] = await pool.query<ResultSetHeader>(
         `UPDATE tournaments SET ${setClause} WHERE id = ? AND organization_id = ?`,

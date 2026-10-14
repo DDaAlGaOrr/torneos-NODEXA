@@ -19,3 +19,13 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
         return res.status(401).json({ error: 'Token inválido o expirado' });
     }
 };
+
+/** Permite el acceso solo a los roles indicados (el rol viene del JWT). */
+export const requireRole = (...roles: string[]) => {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+        if (!req.user || !roles.includes(req.user.role)) {
+            return res.status(403).json({ error: 'No tienes permisos para realizar esta acción' });
+        }
+        next();
+    };
+};
