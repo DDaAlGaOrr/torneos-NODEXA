@@ -49,6 +49,20 @@ export async function validateMatchRefs(
             if (r.length === 0) return 'Uno de los equipos no está inscrito (confirmado) en este torneo';
         }
     }
+    if (has(refs.round_id) && has(refs.home_team_id) && has(refs.away_team_id)) {
+        const [rt] = await pool.query<RowDataPacket[]>('SELECT type FROM rounds WHERE id = ?', [refs.round_id]);
+        if (rt.length > 0 && rt[0].type === 'group') {
+            const [g] = await pool.query<RowDataPacket[]>(
+                'SELECT team_id, group_id FROM group_teams WHERE tournament_id = ? AND team_id IN (?, ?)',
+                [tournamentId, refs.home_team_id, refs.away_team_id]
+            );
+            const groupOf = (id: any) => g.find(x => Number(x.team_id) === Number(id))?.group_id;
+            const gh = groupOf(refs.home_team_id), ga = groupOf(refs.away_team_id);
+            if (gh !== undefined && ga !== undefined && gh !== ga) {
+                return 'En fase de grupos los dos equipos deben pertenecer al mismo grupo';
+            }
+        }
+    }
     if (has(refs.field_id)) {
         const [r] = await pool.query<RowDataPacket[]>(
             'SELECT id FROM fields WHERE id = ? AND organization_id = ?', [refs.field_id, organizationId]

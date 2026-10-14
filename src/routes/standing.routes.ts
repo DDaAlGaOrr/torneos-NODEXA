@@ -5,3 +5,4 @@ import * as standingController from '../controllers/standing.controller';
 export const standingsRoutes = Router();
 
 standingsRoutes.get('/:tournamentId/standings', requireAuth, standingController.getStandings);
+standingsRoutes.get('/:tournamentId/standings/groups', requireAuth, standingController.getStandingsByGroup);
