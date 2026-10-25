@@ -1,12 +1,14 @@
 import { Router } from 'express';
-import { requireAuth } from '../middlewares/auth.middleware';
+import { requireAuth, requireRole } from '../middlewares/auth.middleware';
 import * as playerController from '../controllers/player.controller';
+import * as statsController from '../controllers/player_stats.controller';
 
 export const playerRoutes = Router();
 
-playerRoutes.post('/', requireAuth, playerController.create);
+playerRoutes.post('/', requireAuth, requireRole('admin', 'coach'), playerController.create);
 playerRoutes.get('/team/:teamId', requireAuth, playerController.getByTeam);
-playerRoutes.put('/:id', requireAuth, playerController.update);
-playerRoutes.delete('/:id/team/:teamId', requireAuth, playerController.remove);
+playerRoutes.get('/:id/stats', requireAuth, statsController.getPlayerStats);
+playerRoutes.put('/:id', requireAuth, requireRole('admin', 'coach'), playerController.update);
+playerRoutes.delete('/:id/team/:teamId', requireAuth, requireRole('admin', 'coach'), playerController.remove);
 
 export default playerRoutes;

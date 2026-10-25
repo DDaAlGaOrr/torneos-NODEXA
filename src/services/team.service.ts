@@ -2,12 +2,12 @@ import * as teamModel from '../model/team.model';
 
 export async function createTeam(
     organizationId: number, categoryId: number, name: string,
-    shortName: string, primaryColor: string, contactEmail: string,
+    shortName: string, primaryColor: string, contactName: string, contactEmail: string,
     contactPhone: string, coachIds: number[]
 ) {
     return await teamModel.create(
         organizationId, categoryId, name, shortName,
-        primaryColor, contactEmail, contactPhone, coachIds
+        primaryColor, contactName, contactEmail, contactPhone, coachIds
     );
 }
 
@@ -17,15 +17,30 @@ export async function getTeams(organizationId: number) {
 
 export async function updateTeam(
     id: number, organizationId: number, categoryId: number, name: string,
-    shortName: string, primaryColor: string, contactEmail: string,
+    shortName: string, primaryColor: string, contactName: string, contactEmail: string,
     contactPhone: string, coachIds: number[]
 ) {
     return await teamModel.update(
         id, organizationId, categoryId, name, shortName,
-        primaryColor, contactEmail, contactPhone, coachIds
+        primaryColor, contactName, contactEmail, contactPhone, coachIds
     );
 }
 
 export async function deleteTeam(id: number, organizationId: number) {
     return await teamModel.remove(id, organizationId);
+}
+export async function setCaptain(teamId: number, organizationId: number, playerId: number | null) {
+    return await teamModel.setCaptain(teamId, organizationId, playerId);
+}
+
+export async function categoryBelongsToOrg(categoryId: number, organizationId: number) {
+    return await teamModel.categoryBelongsToOrg(categoryId, organizationId);
+}
+
+export async function countCoachesOfOrg(coachIds: number[], organizationId: number) {
+    return await teamModel.countCoachesOfOrg(coachIds, organizationId);
+}
+
+export async function historyOf(teamId: number, organizationId: number) {
+    return await teamModel.historyOf(teamId, organizationId);
 }

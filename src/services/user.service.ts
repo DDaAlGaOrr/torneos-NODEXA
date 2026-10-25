@@ -16,6 +16,15 @@ export async function updateUser(id: number, name: string, email: string, active
     return await userModel.update(id, name, email, active, role, organizationId);
 }
 
+export async function changeRole(id: number, fromRole: string, toRole: string, organizationId: number) {
+    return await userModel.changeRole(id, fromRole, toRole, organizationId);
+}
+
+export async function resetPassword(id: number, role: string, organizationId: number, passwordPlain: string) {
+    const passwordHash = await bcrypt.hash(passwordPlain, await bcrypt.genSalt(10));
+    return await userModel.setPassword(id, role, organizationId, passwordHash);
+}
+
 export async function deleteUser(id: number, role: string, organizationId: number) {
     return await userModel.remove(id, role, organizationId);
 }

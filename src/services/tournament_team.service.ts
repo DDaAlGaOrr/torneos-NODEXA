@@ -17,3 +17,9 @@ export async function getTeams(tournamentId: number) {
 export async function withdrawTeam(tournamentId: number, teamId: number) {
     return await tournamentTeamModel.removeEnrollment(tournamentId, teamId);
 }
+export async function hasRoom(tournamentId: number) {
+    const max = await tournamentTeamModel.getMaxTeams(tournamentId);
+    if (max === null) return false;
+    const current = await tournamentTeamModel.countConfirmed(tournamentId);
+    return current < max;
+}

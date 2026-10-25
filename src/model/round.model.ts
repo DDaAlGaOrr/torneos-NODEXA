@@ -1,5 +1,8 @@
 import pool from '../conection/index';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
+import { buildSet } from '../utils/fields';
+
+export const ROUND_UPDATABLE = ['group_id', 'name', 'round_order', 'type', 'status'] as const;
 
 export async function verifyTournamentOwnership(tournamentId: number, organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -40,24 +43,29 @@ export async function findAllByTournament(tournamentId: number) {
     return rows;
 }
 
-export async function update(id: number, updateFields: any) {
-    const fields = Object.keys(updateFields);
-    if (fields.length === 0) return false;
-
-    const setClause = fields.map(field => `${field} = ?`).join(', ');
-    const values = Object.values(updateFields);
+export async function update(id: number, tournamentId: number, updateFields: any) {
+    const { keys, setClause, values } = buildSet(updateFields, ROUND_UPDATABLE);
+    if (keys.length === 0) return false;
 
     const [result] = await pool.query<ResultSetHeader>(
-        `UPDATE rounds SET ${setClause} WHERE id = ?`,
-        [...values, id]
+        `UPDATE rounds SET ${setClause} WHERE id = ? AND tournament_id = ?`,
+        [...values, id, tournamentId]
     );
     return result.affectedRows > 0;
 }
 
-export async function remove(id: number) {
+export async function remove(id: number, tournamentId: number) {
     const [result] = await pool.query<ResultSetHeader>(
-        'DELETE FROM rounds WHERE id = ?',
-        [id]
+        'DELETE FROM rounds WHERE id = ? AND tournament_id = ?',
+        [id, tournamentId]
     );
     return result.affectedRows > 0;
+}
+
+export async function groupBelongsToTournament(groupId: number, tournamentId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT id FROM `groups` WHERE id = ? AND tournament_id = ?',
+        [groupId, tournamentId]
+    );
+    return rows.length > 0;
 }
