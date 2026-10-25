@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../middlewares/auth.middleware';
 import * as statisticController from '../controllers/statistic.controller';
+import * as statsController from '../controllers/player_stats.controller';
 
 export const statisticsRoutes = Router();
 
@@ -8,3 +9,5 @@ statisticsRoutes.get('/:tournamentId/statistics/top-scorers', requireAuth, stati
 statisticsRoutes.get('/:tournamentId/statistics/assists', requireAuth, statisticController.getTopAssists);
 statisticsRoutes.get('/:tournamentId/statistics/fair-play', requireAuth, statisticController.getFairPlay);
 statisticsRoutes.get('/:tournamentId/sanctions', requireAuth, statisticController.getSanctions);
+statisticsRoutes.get('/:tournamentId/statistics/teams', requireAuth, statsController.getTournamentTeamStats);
+statisticsRoutes.get('/:tournamentId/statistics/goalkeepers', requireAuth, statsController.getGoalkeepers);

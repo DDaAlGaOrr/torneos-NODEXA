@@ -1,12 +1,13 @@
 import { catchAsync } from '../middlewares/error.handler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as teamService from '../services/team.service';
+import { canManageTeam } from '../services/player.service';
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface TeamInput {
-    name: string; category_id: number; short_name: string; primary_color: string;
+    name: string; category_id: number; short_name: string; primary_color: string; contact_name: string;
     contact_email: string; contact_phone: string; coach_ids: number[];
 }
 
@@ -15,6 +16,7 @@ function parseTeamBody(body: any): { error: string } | { data: TeamInput } {
     const name = String(body?.name ?? '').trim();
     const short_name = String(body?.short_name ?? '').trim();
     const primary_color = String(body?.primary_color ?? '').trim();
+    const contact_name = String(body?.contact_name ?? '').trim();
     const contact_email = String(body?.contact_email ?? '').trim();
     const contact_phone = String(body?.contact_phone ?? '').trim();
     const category_id = Number(body?.category_id);
@@ -23,6 +25,7 @@ function parseTeamBody(body: any): { error: string } | { data: TeamInput } {
     if (name.length > 100) return { error: 'El nombre del equipo no puede pasar de 100 caracteres' };
     if (short_name.length > 10) return { error: 'El nombre corto no puede pasar de 10 caracteres' };
     if (primary_color && !HEX_COLOR.test(primary_color)) return { error: 'El color debe tener el formato #RRGGBB' };
+    if (contact_name.length > 150) return { error: 'El nombre del delegado no puede pasar de 150 caracteres' };
     if (contact_email && (contact_email.length > 150 || !EMAIL.test(contact_email))) return { error: 'El correo de contacto no es válido' };
     if (contact_phone.length > 30) return { error: 'El teléfono no puede pasar de 30 caracteres' };
 
@@ -32,7 +35,7 @@ function parseTeamBody(body: any): { error: string } | { data: TeamInput } {
     }
     const coach_ids = Array.from(new Set(rawCoaches.map(Number))) as number[];
 
-    return { data: { name, category_id, short_name, primary_color, contact_email, contact_phone, coach_ids } };
+    return { data: { name, category_id, short_name, primary_color, contact_name, contact_email, contact_phone, coach_ids } };
 }
 
 /** Categoría y entrenadores deben ser de la misma organización. */
@@ -58,7 +61,7 @@ export const create = catchAsync(async (req: AuthRequest, res) => {
 
     const result = await teamService.createTeam(
         organizationId, d.category_id, d.name, d.short_name,
-        d.primary_color, d.contact_email, d.contact_phone, d.coach_ids
+        d.primary_color, d.contact_name, d.contact_email, d.contact_phone, d.coach_ids
     );
 
     return { code: 201, data: result };
@@ -84,7 +87,7 @@ export const update = catchAsync(async (req: AuthRequest, res) => {
 
     const success = await teamService.updateTeam(
         Number(id), organizationId, d.category_id, d.name, d.short_name,
-        d.primary_color, d.contact_email, d.contact_phone, d.coach_ids
+        d.primary_color, d.contact_name, d.contact_email, d.contact_phone, d.coach_ids
     );
 
     if (!success) {
@@ -120,6 +123,10 @@ export const setCaptain = catchAsync(async (req: AuthRequest, res) => {
     const { id } = req.params;
     const organizationId = req.user.organization_id;
     const { player_id = null } = req.body;
+
+    if (!(await canManageTeam(req.user, Number(id)))) {
+        return { code: 403, data: { message: 'No tienes permiso para modificar este equipo' } };
+    }
 
     const success = await teamService.setCaptain(
         Number(id), organizationId, player_id === null ? null : Number(player_id)

@@ -4,6 +4,7 @@ import * as standingService from '../services/standing.service';
 import { verifyTournamentOwnership } from '../model/tournament_team.model';
 import { rebuildTournamentStandalone } from '../model/recalc.model';
 import { logAudit } from '../utils/audit';
+import { notifyChange } from '../utils/live';
 
 export const recalculate = catchAsync(async (req: AuthRequest, res) => {
     const tournamentId = Number(req.params.tournamentId);
@@ -13,6 +14,7 @@ export const recalculate = catchAsync(async (req: AuthRequest, res) => {
 
     const result = await rebuildTournamentStandalone(tournamentId);
     await logAudit(req.user, { action: 'tournament.recalculate', entityType: 'tournament', entityId: tournamentId, newValues: result });
+    notifyChange({ kind: 'recalculated', organization_id: req.user.organization_id, tournament_id: tournamentId });
     return { code: 200, data: { message: 'Tabla, estadísticas y sanciones recalculadas', ...result } };
 });
 

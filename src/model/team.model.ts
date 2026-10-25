@@ -3,7 +3,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2';
 
 export async function create(
     organizationId: number, categoryId: number, name: string,
-    shortName: string, primaryColor: string, contactEmail: string,
+    shortName: string, primaryColor: string, contactName: string, contactEmail: string,
     contactPhone: string, coachIds: number[]
 ) {
     const connection = await pool.getConnection();
@@ -12,9 +12,9 @@ export async function create(
 
         const [teamResult] = await connection.query<ResultSetHeader>(
             `INSERT INTO teams 
-            (organization_id, category_id, name, short_name, primary_color, contact_email, contact_phone) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [organizationId, categoryId, name, shortName, primaryColor, contactEmail, contactPhone]
+            (organization_id, category_id, name, short_name, primary_color, contact_name, contact_email, contact_phone)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [organizationId, categoryId, name, shortName, primaryColor, contactName || null, contactEmail, contactPhone]
         );
         const teamId = teamResult.insertId;
 
@@ -41,7 +41,7 @@ export async function findAllByOrganization(organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT t.id, t.name, t.short_name, t.logo_url, t.primary_color,
                 t.category_id, c.name as category_name,
-                t.contact_email, t.contact_phone,
+                t.contact_name, t.contact_email, t.contact_phone,
                 t.captain_player_id, cp.name as captain_name,
                 (SELECT COUNT(*) FROM players p WHERE p.team_id = t.id) as players_count
          FROM teams t
@@ -105,7 +105,7 @@ export async function historyOf(teamId: number, organizationId: number) {
 
 export async function update(
     id: number, organizationId: number, categoryId: number, name: string,
-    shortName: string, primaryColor: string, contactEmail: string,
+    shortName: string, primaryColor: string, contactName: string, contactEmail: string,
     contactPhone: string, coachIds: number[]
 ) {
     const connection = await pool.getConnection();
@@ -113,10 +113,10 @@ export async function update(
         await connection.beginTransaction();
 
         const [updateResult] = await connection.query<ResultSetHeader>(
-            `UPDATE teams 
-             SET category_id = ?, name = ?, short_name = ?, primary_color = ?, contact_email = ?, contact_phone = ? 
+            `UPDATE teams
+             SET category_id = ?, name = ?, short_name = ?, primary_color = ?, contact_name = ?, contact_email = ?, contact_phone = ?
              WHERE id = ? AND organization_id = ?`,
-            [categoryId, name, shortName, primaryColor, contactEmail, contactPhone, id, organizationId]
+            [categoryId, name, shortName, primaryColor, contactName || null, contactEmail, contactPhone, id, organizationId]
         );
 
         if (updateResult.affectedRows === 0) {

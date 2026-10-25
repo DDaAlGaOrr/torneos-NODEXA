@@ -1,6 +1,7 @@
 import { catchAsync } from '../middlewares/error.handler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as playerService from '../services/player.service';
+import { getTeamPlayers } from '../services/player_stats.service';
 import { pickAllowed } from '../utils/fields';
 import { PLAYER_UPDATABLE } from '../model/player.model';
 
@@ -49,7 +50,8 @@ export const create = catchAsync(async (req: AuthRequest, res) => {
     const invalid = validatePlayerFields(fields);
     if (invalid) return { code: 400, data: { message: invalid } };
 
-    const hasAccess = await playerService.checkTeamAccess(team_id, organizationId);
+    // Un entrenador solo gestiona los equipos donde está asignado
+    const hasAccess = await playerService.canManageTeam(req.user, Number(team_id));
     if (!hasAccess) {
         return { code: 403, data: { message: 'No tienes permiso para agregar jugadores a este equipo' } };
     }
@@ -71,7 +73,9 @@ export const getByTeam = catchAsync(async (req: AuthRequest, res) => {
         return { code: 403, data: { message: 'Acceso denegado a este equipo' } };
     }
 
-    const result = await playerService.getPlayersByTeam(teamId);
+    // ?tournament_id=N limita los totales a ese torneo; sin él, suma todos
+    const tid = Number(req.query.tournament_id);
+    const result = await getTeamPlayers(teamId, Number.isInteger(tid) && tid > 0 ? tid : null);
     return { code: 200, data: result };
 });
 
@@ -85,9 +89,9 @@ export const update = catchAsync(async (req: AuthRequest, res) => {
         return { code: 400, data: { message: 'Se requiere el team_id por seguridad' } };
     }
 
-    const hasAccess = await playerService.checkTeamAccess(team_id, organizationId);
+    const hasAccess = await playerService.canManageTeam(req.user, Number(team_id));
     if (!hasAccess) {
-        return { code: 403, data: { message: 'Acceso denegado' } };
+        return { code: 403, data: { message: 'No tienes permiso para modificar jugadores de este equipo' } };
     }
 
     if (Object.keys(updateFields).length === 0) {
@@ -111,9 +115,9 @@ export const remove = catchAsync(async (req: AuthRequest, res) => {
     const { id, teamId } = req.params;
     const organizationId = req.user.organization_id;
 
-    const hasAccess = await playerService.checkTeamAccess(Number(teamId), organizationId);
+    const hasAccess = await playerService.canManageTeam(req.user, Number(teamId));
     if (!hasAccess) {
-        return { code: 403, data: { message: 'Acceso denegado' } };
+        return { code: 403, data: { message: 'No tienes permiso para eliminar jugadores de este equipo' } };
     }
 
     // Sus goles y tarjetas perderían al jugador en las estadísticas

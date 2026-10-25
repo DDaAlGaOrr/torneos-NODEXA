@@ -2,6 +2,8 @@ import { catchAsync } from '../middlewares/error.handler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as groupModel from '../model/group.model';
 import { verifyTournamentOwnership } from '../model/tournament_team.model';
+import { logAudit } from '../utils/audit';
+import { notifyChange } from '../utils/live';
 
 const DENIED = { code: 403, data: { message: 'Acceso denegado al torneo' } };
 
@@ -94,6 +96,35 @@ export const removeTeam = catchAsync(async (req: AuthRequest, res) => {
         : { code: 404, data: { message: 'El equipo no está en ese grupo' } };
 });
 
+/** Mueve un equipo al grupo indicado (lo saca del que tenía). Pensado para arrastrar en la pantalla de grupos. */
+export const moveTeam = catchAsync(async (req: AuthRequest, res) => {
+    const tournamentId = Number(req.params.tournamentId);
+    const groupId = Number(req.params.id);
+    const teamId = Number(req.params.teamId);
+    if (!(await verifyTournamentOwnership(tournamentId, req.user.organization_id))) return DENIED;
+    if (!(await groupModel.belongsToTournament(groupId, tournamentId))) {
+        return { code: 404, data: { message: 'Grupo no encontrado' } };
+    }
+    if (!(await groupModel.isTeamConfirmed(tournamentId, teamId))) {
+        return { code: 400, data: { message: 'El equipo no está inscrito (confirmado) en este torneo' } };
+    }
+    const current = await groupModel.groupOfTeam(tournamentId, teamId);
+    if (current === groupId) {
+        return { code: 200, data: { message: 'El equipo ya está en ese grupo' } };
+    }
+    if (current !== null && (await groupModel.countMatchesOfTeam(teamId, tournamentId)) > 0) {
+        return { code: 409, data: { message: 'El equipo ya tiene partidos de fase de grupos; no se puede cambiar de grupo' } };
+    }
+
+    await groupModel.moveTeam(tournamentId, teamId, groupId);
+    await logAudit(req.user, {
+        action: 'group.move_team', entityType: 'tournament', entityId: tournamentId,
+        oldValues: { team_id: teamId, group_id: current }, newValues: { team_id: teamId, group_id: groupId },
+    });
+    notifyChange({ kind: 'groups', organization_id: req.user.organization_id, tournament_id: tournamentId });
+    return { code: 200, data: { message: 'Equipo movido de grupo' } };
+});
+
 /** Sorteo automático: crea los grupos y reparte en serpiente a los equipos confirmados. */
 export const draw = catchAsync(async (req: AuthRequest, res) => {
     const { tournamentId } = req.params;
@@ -120,5 +151,6 @@ export const draw = catchAsync(async (req: AuthRequest, res) => {
     }
 
     await groupModel.createAndDistribute(Number(tournamentId), groupCount, teamIds);
+    notifyChange({ kind: 'groups', organization_id: req.user.organization_id, tournament_id: Number(tournamentId) });
     return { code: 201, data: await groupModel.findAllByTournament(Number(tournamentId)) };
 });

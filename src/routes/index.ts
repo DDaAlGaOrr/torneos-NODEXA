@@ -17,6 +17,9 @@ import { groupRoutes } from './group.routes'
 import { sportRoutes } from './sport.routes'
 import { auditRoutes } from './audit.routes'
 import { scheduleRoutes } from './schedule.routes'
+import { meRoutes } from './me.routes'
+import { sanctionRoutes } from './sanction.routes'
+import { dashboardRoutes } from './dashboard.routes'
 
 export const router = Router();
 
@@ -38,3 +41,6 @@ router.use('/tournaments', bracketRoutes)
 router.use('/tournaments', groupRoutes)
 router.use('/tournaments', scheduleRoutes)
 router.use('/audit-logs', auditRoutes)
+router.use('/me', meRoutes)
+router.use('/sanctions', sanctionRoutes)
+router.use('/dashboard', dashboardRoutes)

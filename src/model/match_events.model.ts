@@ -3,6 +3,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { PoolConnection } from 'mysql2/promise';
 import { Actor, logAudit } from '../utils/audit';
 import { getRules, rebuildTournament } from './recalc.model';
+import { notifyChange } from '../utils/live';
 
 export async function verifyMatchAccess(matchId: number, organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -31,14 +32,15 @@ function scoreColumnFor(eventType: string, teamId: number, matchInfo: any): stri
     return scoresForHome ? 'score_home' : 'score_away';
 }
 
-/** Transacción que termina recalculando el torneo del partido. */
-async function inTransaction<T>(tournamentId: number, work: (conn: PoolConnection) => Promise<T>) {
+/** Transacción que termina recalculando el torneo del partido; ya confirmada, avisa a los paneles en vivo. */
+async function inTransaction<T>(tournamentId: number, actor: Actor, matchId: number, work: (conn: PoolConnection) => Promise<T>) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
         const result = await work(connection);
         await rebuildTournament(connection, tournamentId);
         await connection.commit();
+        notifyChange({ kind: 'match_event', organization_id: actor.organization_id, tournament_id: tournamentId, match_id: matchId });
         return result;
     } catch (error) {
         await connection.rollback();
@@ -56,7 +58,7 @@ export async function addEvent(
     const tournamentId = Number(matchInfo.tournament_id);
     const rules = await getRules(tournamentId);
 
-    return inTransaction(tournamentId, async (connection) => {
+    return inTransaction(tournamentId, actor, matchId, async (connection) => {
         // Amarilla = descanso temporal (minutos configurables por torneo)
         const payload = eventType === 'yellow_card' && rules.yellow_sin_bin_minutes > 0
             ? { sin_bin_minutes: rules.yellow_sin_bin_minutes }
@@ -95,7 +97,7 @@ export async function addEvent(
 
 /** Elimina un evento y revierte el marcador si era gol o autogol. */
 export async function deleteEvent(eventId: number, matchId: number, matchInfo: any, actor: Actor) {
-    return inTransaction(Number(matchInfo.tournament_id), async (connection) => {
+    return inTransaction(Number(matchInfo.tournament_id), actor, matchId, async (connection) => {
         const [rows] = await connection.query<RowDataPacket[]>(
             'SELECT * FROM match_events WHERE id = ? AND match_id = ? FOR UPDATE',
             [eventId, matchId]

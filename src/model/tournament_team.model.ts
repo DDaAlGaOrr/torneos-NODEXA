@@ -60,7 +60,7 @@ export async function enroll(tournamentId: number, teamId: number) {
 export async function findTeamsByTournament(tournamentId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
         `SELECT tt.id as enrollment_id, tt.payment_status, tt.status as enrollment_status, 
-                t.id as team_id, t.name, t.short_name, t.logo_url 
+                t.id as team_id, t.name, t.short_name, t.logo_url, t.primary_color
          FROM tournament_teams tt
          INNER JOIN teams t ON tt.team_id = t.id
          WHERE tt.tournament_id = ?

@@ -10,4 +10,5 @@ groupRoutes.get('/:tournamentId/groups', requireAuth, groupController.getAll);
 groupRoutes.put('/:tournamentId/groups/:id', requireAuth, requireRole('admin'), groupController.rename);
 groupRoutes.delete('/:tournamentId/groups/:id', requireAuth, requireRole('admin'), groupController.remove);
 groupRoutes.post('/:tournamentId/groups/:id/teams', requireAuth, requireRole('admin'), groupController.addTeam);
+groupRoutes.put('/:tournamentId/groups/:id/teams/:teamId', requireAuth, requireRole('admin'), groupController.moveTeam);
 groupRoutes.delete('/:tournamentId/groups/:id/teams/:teamId', requireAuth, requireRole('admin'), groupController.removeTeam);

@@ -17,6 +17,25 @@ export async function create(tournamentId: number, name: string) {
     return { id: result.insertId, tournament_id: tournamentId, name };
 }
 
+/** Saca al equipo de su grupo actual (si tiene) y lo mete en `groupId`, en una sola transacción. */
+export async function moveTeam(tournamentId: number, teamId: number, groupId: number) {
+    const connection = await pool.getConnection();
+    try {
+        await connection.beginTransaction();
+        await connection.query('DELETE FROM group_teams WHERE tournament_id = ? AND team_id = ?', [tournamentId, teamId]);
+        await connection.query(
+            'INSERT INTO group_teams (group_id, team_id, tournament_id) VALUES (?, ?, ?)',
+            [groupId, teamId, tournamentId]
+        );
+        await connection.commit();
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+    } finally {
+        connection.release();
+    }
+}
+
 /** Grupos del torneo con sus equipos. */
 export async function findAllByTournament(tournamentId: number) {
     const [groups] = await pool.query<RowDataPacket[]>(
@@ -24,7 +43,7 @@ export async function findAllByTournament(tournamentId: number) {
         [tournamentId]
     );
     const [teams] = await pool.query<RowDataPacket[]>(
-        `SELECT gt.group_id, t.id as team_id, t.name, t.short_name, t.logo_url
+        `SELECT gt.group_id, t.id as team_id, t.name, t.short_name, t.logo_url, t.primary_color
          FROM group_teams gt
          INNER JOIN teams t ON gt.team_id = t.id
          WHERE gt.tournament_id = ?

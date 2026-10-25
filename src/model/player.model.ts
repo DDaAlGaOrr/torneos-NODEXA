@@ -12,6 +12,14 @@ export async function verifyTeamOwnership(teamId: number, organizationId: number
     return rows.length > 0;
 }
 
+export async function isCoachOfTeam(userId: number, teamId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT team_id FROM team_coaches WHERE user_id = ? AND team_id = ?',
+        [userId, teamId]
+    );
+    return rows.length > 0;
+}
+
 export async function create(
     teamId: number, name: string, jerseyNumber: string, position: string
 ) {

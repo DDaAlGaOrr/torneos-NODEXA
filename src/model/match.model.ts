@@ -5,6 +5,7 @@ import { PoolConnection } from 'mysql2/promise';
 import { buildSet } from '../utils/fields';
 import { Actor, logAudit } from '../utils/audit';
 import { rebuildTournament } from './recalc.model';
+import { LiveChangeKind, notifyChange } from '../utils/live';
 
 export const MATCH_UPDATABLE = [
     'round_id', 'home_team_id', 'away_team_id', 'field_id', 'scheduled_at', 'status',
@@ -240,14 +241,21 @@ export async function findRosters(tournamentId: number, teamIds: number[], curre
     }));
 }
 
-/** Ejecuta `work` en una transacción y, antes de confirmar, recalcula tabla, estadísticas y sanciones. */
-async function inTransaction<T>(tournamentId: number, work: (conn: PoolConnection) => Promise<T>) {
+/**
+ * Ejecuta `work` en una transacción y, antes de confirmar, recalcula tabla, estadísticas y sanciones.
+ * Ya confirmado, avisa del cambio a los paneles en vivo de la liga.
+ */
+async function inTransaction<T>(
+    tournamentId: number, change: { kind: LiveChangeKind; actor: Actor; match_id: number },
+    work: (conn: PoolConnection) => Promise<T>
+) {
     const connection = await pool.getConnection();
     try {
         await connection.beginTransaction();
         const result = await work(connection);
         await rebuildTournament(connection, tournamentId);
         await connection.commit();
+        notifyChange({ kind: change.kind, organization_id: change.actor.organization_id, tournament_id: tournamentId, match_id: change.match_id });
         return result;
     } catch (error) {
         await connection.rollback();
@@ -261,7 +269,7 @@ export async function update(id: number, tournamentId: number, updateFields: any
     const { keys, setClause, values } = buildSet(updateFields, MATCH_UPDATABLE);
     if (keys.length === 0) return false;
 
-    return inTransaction(tournamentId, async (conn) => {
+    return inTransaction(tournamentId, { kind: 'match_updated', actor, match_id: id }, async (conn) => {
         const [before] = await conn.query<RowDataPacket[]>(
             `SELECT ${keys.join(', ')} FROM matches WHERE id = ? AND tournament_id = ? FOR UPDATE`, [id, tournamentId]
         );
@@ -281,7 +289,7 @@ export async function update(id: number, tournamentId: number, updateFields: any
 }
 
 export async function remove(id: number, tournamentId: number, actor: Actor) {
-    return inTransaction(tournamentId, async (conn) => {
+    return inTransaction(tournamentId, { kind: 'match_deleted', actor, match_id: id }, async (conn) => {
         const [before] = await conn.query<RowDataPacket[]>(
             'SELECT * FROM matches WHERE id = ? AND tournament_id = ? FOR UPDATE', [id, tournamentId]
         );
@@ -305,7 +313,7 @@ export interface FinishOptions {
  * y recalcula tabla, estadísticas y sanciones. Todo en una sola transacción.
  */
 export async function finishAndAdvance(matchId: number, tournamentId: number, actor: Actor, options: FinishOptions = {}) {
-    return inTransaction(tournamentId, async (connection) => {
+    return inTransaction(tournamentId, { kind: 'match_finished', actor, match_id: matchId }, async (connection) => {
         // FOR UPDATE: bloquea la fila para evitar doble finalización concurrente
         const [rows] = await connection.query<RowDataPacket[]>(
             `SELECT m.home_team_id, m.away_team_id, m.score_home, m.score_away, m.penalties_home, m.penalties_away,
@@ -394,7 +402,7 @@ export async function finishAndAdvance(matchId: number, tournamentId: number, ac
  * En la llave, saca al ganador del siguiente partido (solo si ese partido aún no empieza).
  */
 export async function reopen(matchId: number, tournamentId: number, actor: Actor) {
-    return inTransaction(tournamentId, async (conn) => {
+    return inTransaction(tournamentId, { kind: 'match_reopened', actor, match_id: matchId }, async (conn) => {
         const [rows] = await conn.query<RowDataPacket[]>(
             `SELECT status, winner_team_id, next_match_id, next_match_position, score_home, score_away,
                     penalties_home, penalties_away

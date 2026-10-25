@@ -3,6 +3,7 @@ import { AuthRequest } from '../middlewares/auth.middleware';
 import * as bracketService from '../services/bracket.service';
 import { verifyTournamentOwnership } from '../model/tournament_team.model';
 import { logAudit } from '../utils/audit';
+import { notifyChange } from '../utils/live';
 
 export const getBracket = catchAsync(async (req: AuthRequest, res) => {
     const { tournamentId } = req.params;
@@ -47,6 +48,7 @@ export const generate = catchAsync(async (req: AuthRequest, res) => {
         if (!result.dry_run) {
             const { bracket, ...summary } = result as any;
             await logAudit(req.user, { action: 'bracket.generate', entityType: 'tournament', entityId: Number(tournamentId), newValues: summary });
+            notifyChange({ kind: 'bracket', organization_id: organizationId, tournament_id: Number(tournamentId) });
         }
         return { code: result.dry_run ? 200 : 201, data: result };
     } catch (error: any) {

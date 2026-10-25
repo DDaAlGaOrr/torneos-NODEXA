@@ -2,6 +2,7 @@ import pool from '../conection/index';
 import { ResultSetHeader, RowDataPacket } from 'mysql2';
 import { Actor, logAudit } from '../utils/audit';
 import { rebuildTournament } from './recalc.model';
+import { notifyChange } from '../utils/live';
 
 export async function findTournament(tournamentId: number, organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
@@ -94,6 +95,7 @@ export async function persistSchedule(tournamentId: number, rounds: PlannedRound
             newValues: summary,
         }, connection);
         await connection.commit();
+        notifyChange({ kind: 'schedule', organization_id: actor.organization_id, tournament_id: tournamentId });
         return { rounds: rounds.length, matches: created };
     } catch (error) {
         await connection.rollback();
