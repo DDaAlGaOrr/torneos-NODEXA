@@ -39,8 +39,11 @@ export async function create(
 
 export async function findAllByOrganization(organizationId: number) {
     const [rows] = await pool.query<RowDataPacket[]>(
-        `SELECT t.id, t.name, t.short_name, t.primary_color, c.name as category_name,
-                t.captain_player_id, cp.name as captain_name
+        `SELECT t.id, t.name, t.short_name, t.logo_url, t.primary_color,
+                t.category_id, c.name as category_name,
+                t.contact_email, t.contact_phone,
+                t.captain_player_id, cp.name as captain_name,
+                (SELECT COUNT(*) FROM players p WHERE p.team_id = t.id) as players_count
          FROM teams t
          LEFT JOIN categories c ON t.category_id = c.id
          LEFT JOIN players cp ON t.captain_player_id = cp.id
@@ -48,7 +51,56 @@ export async function findAllByOrganization(organizationId: number) {
          ORDER BY t.name ASC`,
         [organizationId]
     );
-    return rows;
+    const [coaches] = await pool.query<RowDataPacket[]>(
+        `SELECT tc.team_id, u.id, u.name
+         FROM team_coaches tc
+         INNER JOIN users u ON tc.user_id = u.id
+         INNER JOIN teams t ON tc.team_id = t.id
+         WHERE t.organization_id = ?
+         ORDER BY u.name ASC`,
+        [organizationId]
+    );
+    return rows.map(r => ({
+        ...r,
+        players_count: Number(r.players_count),
+        coaches: coaches.filter(c => c.team_id === r.id).map(c => ({ id: c.id as number, name: c.name as string })),
+    }));
+}
+
+/** La categoría debe pertenecer a la organización. */
+export async function categoryBelongsToOrg(categoryId: number, organizationId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT id FROM categories WHERE id = ? AND organization_id = ?',
+        [categoryId, organizationId]
+    );
+    return rows.length > 0;
+}
+
+/** Cuántos de los IDs son entrenadores de la organización. */
+export async function countCoachesOfOrg(coachIds: number[], organizationId: number) {
+    if (coachIds.length === 0) return 0;
+    const [rows] = await pool.query<RowDataPacket[]>(
+        "SELECT COUNT(*) as total FROM users WHERE id IN (?) AND organization_id = ? AND role = 'coach'",
+        [coachIds, organizationId]
+    );
+    return Number(rows[0].total);
+}
+
+/**
+ * Borrar un equipo elimina en cascada sus partidos, eventos y posiciones.
+ * Se considera "con historial" si tiene partidos o una inscripción vigente.
+ */
+export async function historyOf(teamId: number, organizationId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        `SELECT
+            (SELECT COUNT(*) FROM matches m WHERE m.home_team_id = t.id OR m.away_team_id = t.id) as matches,
+            (SELECT COUNT(*) FROM tournament_teams tt WHERE tt.team_id = t.id AND tt.status <> 'withdrawn') as enrollments
+         FROM teams t
+         WHERE t.id = ? AND t.organization_id = ?`,
+        [teamId, organizationId]
+    );
+    if (rows.length === 0) return { matches: 0, enrollments: 0 };
+    return { matches: Number(rows[0].matches), enrollments: Number(rows[0].enrollments) };
 }
 
 export async function update(

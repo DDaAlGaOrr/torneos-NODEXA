@@ -19,3 +19,10 @@ export async function deletePlayer(id: number, teamId: number) {
 export async function checkTeamAccess(teamId: number, organizationId: number) {
     return await playerModel.verifyTeamOwnership(teamId, organizationId);
 }
+export async function jerseyTaken(teamId: number, jerseyNumber: string, excludeId?: number) {
+    return await playerModel.jerseyTaken(teamId, jerseyNumber, excludeId);
+}
+
+export async function countEvents(playerId: number, teamId: number) {
+    return await playerModel.countEvents(playerId, teamId);
+}

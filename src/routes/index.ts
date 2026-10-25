@@ -14,11 +14,15 @@ import { standingsRoutes } from './standing.routes'
 import { statisticsRoutes } from './statistic.router'
 import { bracketRoutes } from './bracket.routes'
 import { groupRoutes } from './group.routes'
+import { sportRoutes } from './sport.routes'
+import { auditRoutes } from './audit.routes'
+import { scheduleRoutes } from './schedule.routes'
 
 export const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/categories', categoryRoutes);
+router.use('/sports', sportRoutes);
 router.use('/fields', fieldsRoutes);
 router.use('/users', userRoutes);
 router.use('/teams', teamRoutes)
@@ -32,3 +36,5 @@ router.use('/tournaments', standingsRoutes)
 router.use('/tournaments', statisticsRoutes)
 router.use('/tournaments', bracketRoutes)
 router.use('/tournaments', groupRoutes)
+router.use('/tournaments', scheduleRoutes)
+router.use('/audit-logs', auditRoutes)

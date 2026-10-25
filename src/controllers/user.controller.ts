@@ -57,6 +57,10 @@ export const update = catchAsync(async (req: AuthRequest, res) => {
         return { code: 400, data: { message: 'Nombre y email son obligatorios' } };
     }
 
+    if (Number(id) === req.user.id && Number(active) === 0) {
+        return { code: 400, data: { message: 'No puedes desactivar tu propia cuenta' } };
+    }
+
     const success = await userService.updateUser(Number(id), name, email, active, role, organizationId);
 
     if (!success) {
@@ -73,6 +77,10 @@ export const remove = catchAsync(async (req: AuthRequest, res) => {
 
     if (!isValidRole(role)) {
         return { code: 400, data: { message: 'Rol no válido' } };
+    }
+
+    if (Number(id) === req.user.id) {
+        return { code: 400, data: { message: 'No puedes eliminar tu propia cuenta' } };
     }
 
     const success = await userService.deleteUser(Number(id), role, organizationId);

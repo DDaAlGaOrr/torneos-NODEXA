@@ -5,6 +5,8 @@ import * as matchController from '../controllers/match.controller';
 export const matchRoutes = Router();
 
 matchRoutes.put('/:tournamentId/matches/:id/finish', requireAuth, requireRole('admin', 'referee'), matchController.finish);
+matchRoutes.put('/:tournamentId/matches/:id/reopen', requireAuth, requireRole('admin'), matchController.reopen);
+matchRoutes.get('/:tournamentId/matches/:id', requireAuth, matchController.getOne);
 matchRoutes.post('/:tournamentId/matches', requireAuth, requireRole('admin'), matchController.create);
 matchRoutes.get('/:tournamentId/matches', requireAuth, matchController.getByTournament);
 matchRoutes.put('/:tournamentId/matches/:id', requireAuth, requireRole('admin'), matchController.update);

@@ -49,3 +49,24 @@ export async function remove(id: number, teamId: number) {
     );
     return result.affectedRows > 0;
 }
+
+/** ¿Ya hay otro jugador del equipo con ese número? (excludeId = jugador que se está editando) */
+export async function jerseyTaken(teamId: number, jerseyNumber: string, excludeId?: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT id FROM players WHERE team_id = ? AND jersey_number = ? AND id <> ?',
+        [teamId, jerseyNumber, excludeId ?? 0]
+    );
+    return rows.length > 0;
+}
+
+/** Eventos de partido (goles, tarjetas...) ligados al jugador. */
+export async function countEvents(playerId: number, teamId: number) {
+    const [rows] = await pool.query<RowDataPacket[]>(
+        `SELECT COUNT(*) as total
+         FROM match_events e
+         INNER JOIN players p ON p.id = ?  AND p.team_id = ?
+         WHERE e.player_id = p.id OR e.assist_player_id = p.id`,
+        [playerId, teamId]
+    );
+    return Number(rows[0].total);
+}

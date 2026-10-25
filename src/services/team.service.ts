@@ -32,3 +32,15 @@ export async function deleteTeam(id: number, organizationId: number) {
 export async function setCaptain(teamId: number, organizationId: number, playerId: number | null) {
     return await teamModel.setCaptain(teamId, organizationId, playerId);
 }
+
+export async function categoryBelongsToOrg(categoryId: number, organizationId: number) {
+    return await teamModel.categoryBelongsToOrg(categoryId, organizationId);
+}
+
+export async function countCoachesOfOrg(coachIds: number[], organizationId: number) {
+    return await teamModel.countCoachesOfOrg(coachIds, organizationId);
+}
+
+export async function historyOf(teamId: number, organizationId: number) {
+    return await teamModel.historyOf(teamId, organizationId);
+}

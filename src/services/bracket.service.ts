@@ -24,19 +24,30 @@ export async function getTournamentBracket(tournamentId: number) {
                 id: row.match_id,
                 status: row.status,
                 scheduled_at: row.scheduled_at,
+                scheduled_local: row.scheduled_local,
+                field_name: row.field_name,
                 score_home: row.score_home,
                 score_away: row.score_away,
+                penalties_home: row.penalties_home,
+                penalties_away: row.penalties_away,
+                winner_team_id: row.winner_team_id,
                 next_match_id: row.next_match_id,
                 next_match_position: row.next_match_position,
+                prev_match_home_id: row.prev_match_home_id,
+                prev_match_away_id: row.prev_match_away_id,
                 home_team: row.home_team_id ? {
                     id: row.home_team_id,
                     name: row.home_team_name,
-                    logo_url: row.home_team_logo
+                    logo_url: row.home_team_logo,
+                    short_name: row.home_team_short,
+                    primary_color: row.home_team_color
                 } : null,
                 away_team: row.away_team_id ? {
                     id: row.away_team_id,
                     name: row.away_team_name,
-                    logo_url: row.away_team_logo
+                    logo_url: row.away_team_logo,
+                    short_name: row.away_team_short,
+                    primary_color: row.away_team_color
                 } : null
             });
         }
@@ -135,7 +146,7 @@ export async function generateBracket(tournamentId: number, options: GenerateOpt
         }
         if (seeds.length < 2) throw new AppError(400, 'Se necesitan al menos 2 equipos para generar la eliminatoria');
         slots = slotsFromSeeds(seeds);
-        method = options.team_ids ? 'siembra por team_ids (el primero es el seed 1)' : 'siembra por orden de inscripción';
+        method = options.team_ids ? 'siembra en el orden indicado (el primero es el seed 1)' : 'siembra por orden de inscripción';
     }
 
     const plan = buildBracketPlan(slots);

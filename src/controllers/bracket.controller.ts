@@ -2,6 +2,7 @@ import { catchAsync, AppError } from '../middlewares/error.handler';
 import { AuthRequest } from '../middlewares/auth.middleware';
 import * as bracketService from '../services/bracket.service';
 import { verifyTournamentOwnership } from '../model/tournament_team.model';
+import { logAudit } from '../utils/audit';
 
 export const getBracket = catchAsync(async (req: AuthRequest, res) => {
     const { tournamentId } = req.params;
@@ -43,6 +44,10 @@ export const generate = catchAsync(async (req: AuthRequest, res) => {
             replace: body.replace === true,
             force: body.force === true,
         });
+        if (!result.dry_run) {
+            const { bracket, ...summary } = result as any;
+            await logAudit(req.user, { action: 'bracket.generate', entityType: 'tournament', entityId: Number(tournamentId), newValues: summary });
+        }
         return { code: result.dry_run ? 200 : 201, data: result };
     } catch (error: any) {
         if (error instanceof AppError) return { code: error.statusCode, data: { message: error.message } };

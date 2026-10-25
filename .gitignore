@@ -6,3 +6,5 @@ fixes-seguridad-y-partidos.patch
 fixes-seguridad-y-partidos.patch
 e2e-flow.mjs
 e2e-groups-bracket.mjs
+*.patch
+*.mjs

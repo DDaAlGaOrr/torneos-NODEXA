@@ -11,21 +11,33 @@ export async function getBracketMatches(tournamentId: number) {
             m.id as match_id,
             m.status,
             m.scheduled_at,
+            DATE_FORMAT(m.scheduled_at, '%Y-%m-%d %H:%i') as scheduled_local,
+            f.name as field_name,
             m.score_home,
             m.score_away,
+            m.penalties_home,
+            m.penalties_away,
+            m.winner_team_id,
             m.next_match_id,
             m.next_match_position,
+            m.prev_match_home_id,
+            m.prev_match_away_id,
             t1.id as home_team_id,
             t1.name as home_team_name,
             t1.logo_url as home_team_logo,
+            t1.short_name as home_team_short,
+            t1.primary_color as home_team_color,
             t2.id as away_team_id,
             t2.name as away_team_name,
-            t2.logo_url as away_team_logo
+            t2.logo_url as away_team_logo,
+            t2.short_name as away_team_short,
+            t2.primary_color as away_team_color
          FROM rounds r
          INNER JOIN matches m ON r.id = m.round_id
          LEFT JOIN teams t1 ON m.home_team_id = t1.id
          LEFT JOIN teams t2 ON m.away_team_id = t2.id
-         WHERE r.tournament_id = ?
+         LEFT JOIN fields f ON m.field_id = f.id
+         WHERE r.tournament_id = ? AND r.type = 'bracket'
          ORDER BY r.round_order ASC, m.id ASC`,
         [tournamentId]
     );

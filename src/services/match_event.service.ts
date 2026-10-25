@@ -1,4 +1,5 @@
 import * as matchEventModel from '../model/match_events.model';
+import { Actor } from '../utils/audit';
 
 export async function getMatchAccessInfo(matchId: number, organizationId: number) {
     return await matchEventModel.verifyMatchAccess(matchId, organizationId);
@@ -7,10 +8,10 @@ export async function getMatchAccessInfo(matchId: number, organizationId: number
 export async function createEvent(
     matchId: number, teamId: number, playerId: number | null,
     assistPlayerId: number | null, eventType: string, minute: number | null,
-    matchInfo: any
+    matchInfo: any, actor: Actor
 ) {
     return await matchEventModel.addEvent(
-        matchId, teamId, playerId, assistPlayerId, eventType, minute, matchInfo
+        matchId, teamId, playerId, assistPlayerId, eventType, minute, matchInfo, actor
     );
 }
 
@@ -21,6 +22,6 @@ export async function playerBelongsToTeam(playerId: number, teamId: number) {
     return await matchEventModel.playerBelongsToTeam(playerId, teamId);
 }
 
-export async function removeEvent(eventId: number, matchId: number, matchInfo: any) {
-    return await matchEventModel.deleteEvent(eventId, matchId, matchInfo);
+export async function removeEvent(eventId: number, matchId: number, matchInfo: any, actor: Actor) {
+    return await matchEventModel.deleteEvent(eventId, matchId, matchInfo, actor);
 }
